@@ -5,11 +5,11 @@ using System.IO;
 
 namespace UdpEchoServer
 {
-	public class ServeurEchoUdp
+	public class ServeurMcEchoUdp
 	{
 		private UdpClient serveurUdp = null;
 		private FileInfo fichierLog = null;
-		IPEndPoint remoteIPEndPoint = new IPEndPoint (IPAddress.Any, 0);
+		IPEndPoint mcIPEndPoint = null;
 		private bool arretServeur = false;
 		public bool ArretServeur {
 			set {
@@ -17,9 +17,17 @@ namespace UdpEchoServer
 			}
 		}
 
-		public ServeurEchoUdp (int numPort,FileInfo fichierLog)
+		public ServeurMcEchoUdp (IPAddress mcIp, int mcPort,int servPort, FileInfo fichierLog)
 		{
-			serveurUdp = new UdpClient(numPort);
+			byte prefix = mcIp.GetAddressBytes ()[0];
+			prefix &= 240;
+			if (prefix != 224)//if (addressBytes [0] < 224 | addressBytes [0] > 239)
+				throw new Exception ("Adresse multicast doit avoir le préfixe 224.0.0.0/4 !");
+			serveurUdp = new UdpClient(servPort);
+			serveurUdp.Client.SetSocketOption (SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 1);
+
+			mcIPEndPoint = new IPEndPoint (mcIp, mcPort);
+
 			this.fichierLog = fichierLog;
 			StreamWriter streamLog = fichierLog.AppendText();
 			streamLog.WriteLine (DateTime.Now.ToString () + " - Création du serveur");
@@ -32,12 +40,13 @@ namespace UdpEchoServer
 			try{
 				streamLog = fichierLog.AppendText();
 				streamLog.WriteLine(DateTime.Now.ToString()+" - En attente de datagrammes");
-				byte[] byteBuffer = serveurUdp.Receive(ref remoteIPEndPoint);
-				streamLog.WriteLine(DateTime.Now.ToString()+" - Traitement du client " + remoteIPEndPoint);
+				IPEndPoint epDistant = new IPEndPoint(IPAddress.Any,0);
+				byte[] byteBuffer = serveurUdp.Receive(ref epDistant);
+				streamLog.WriteLine(DateTime.Now.ToString()+" - Traitement du client " + epDistant);
+				streamLog.WriteLine("\t\"" + System.Text.UTF8Encoding.UTF8.GetString(byteBuffer) + "\"");
 
-				streamLog.Write("\"" + System.Text.UTF8Encoding.UTF8.GetString(byteBuffer) + "\"");
-				serveurUdp.Send(byteBuffer, byteBuffer.Length, remoteIPEndPoint);
-				streamLog.WriteLine(" - echoed {0} bytes.", byteBuffer.Length);
+				serveurUdp.Send(byteBuffer, byteBuffer.Length, mcIPEndPoint);
+				streamLog.WriteLine(DateTime.Now.ToString()+" - {0} octets renvoyés vers {1}", byteBuffer.Length,mcIPEndPoint);
 			}
 			catch (SocketException se) {
 				streamLog.WriteLine (se.ErrorCode + ": " + se.Message);
