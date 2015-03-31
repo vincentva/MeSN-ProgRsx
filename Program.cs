@@ -16,7 +16,8 @@ namespace UdpEchoServer
 			int servPort = (args.Length == 1) ? Int32.Parse (args [0]) : 7;
 
 			FileInfo fichierLog = new FileInfo ("LogEchoUdp_" + DateTime.Now.Date.ToString ("dd-MM-yy") + ".txt");
-			ServeurMcEchoUdp serveur = new ServeurMcEchoUdp(IPAddress.Parse("240.0.0.1"),1337,servPort, fichierLog);
+			IPEndPoint mcEp = new IPEndPoint (IPAddress.Parse("224.0.0.1"), 1338);
+			ServeurMcEchoUdp serveur = new ServeurMcEchoUdp(mcEp,servPort, fichierLog);
 
 			serveur.RenvoyerEchoEnBoucle ();
 
@@ -25,3 +26,4 @@ namespace UdpEchoServer
 		}
 	}
 }
+

@@ -9,7 +9,7 @@ namespace UdpEchoServer
 	{
 		private UdpClient serveurUdp = null;
 		private FileInfo fichierLog = null;
-		IPEndPoint mcIPEndPoint = null;
+		IPEndPoint mcEndPoint = null;
 		private bool arretServeur = false;
 		public bool ArretServeur {
 			set {
@@ -17,20 +17,20 @@ namespace UdpEchoServer
 			}
 		}
 
-		public ServeurMcEchoUdp (IPAddress mcIp, int mcPort,int servPort, FileInfo fichierLog)
+		public ServeurMcEchoUdp (IPEndPoint mcEndPoint,int servPort, FileInfo fichierLog)
 		{
-			byte prefix = mcIp.GetAddressBytes ()[0];
+			byte prefix = mcEndPoint.Address.GetAddressBytes ()[0];
 			prefix &= 240;
 			if (prefix != 224)//if (addressBytes [0] < 224 | addressBytes [0] > 239)
 				throw new Exception ("Adresse multicast doit avoir le préfixe 224.0.0.0/4 !");
 			serveurUdp = new UdpClient(servPort);
 			serveurUdp.Client.SetSocketOption (SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 1);
 
-			mcIPEndPoint = new IPEndPoint (mcIp, mcPort);
+			this.mcEndPoint = mcEndPoint;
 
 			this.fichierLog = fichierLog;
 			StreamWriter streamLog = fichierLog.AppendText();
-			streamLog.WriteLine (DateTime.Now.ToString () + " - Création du serveur");
+			streamLog.WriteLine (DateTime.Now.ToString ("dd/MM/yy HH:mm:ss") + " - Création du serveur");
 			streamLog.Close ();
 		}
 
@@ -40,13 +40,16 @@ namespace UdpEchoServer
 			try{
 				streamLog = fichierLog.AppendText();
 				streamLog.WriteLine(DateTime.Now.ToString()+" - En attente de datagrammes");
+				streamLog.Flush();
+
 				IPEndPoint epDistant = new IPEndPoint(IPAddress.Any,0);
 				byte[] byteBuffer = serveurUdp.Receive(ref epDistant);
-				streamLog.WriteLine(DateTime.Now.ToString()+" - Traitement du client " + epDistant);
+				streamLog.WriteLine(DateTime.Now.ToString("dd/MM/yy HH:mm:ss")+" - Traitement du client " + epDistant);
 				streamLog.WriteLine("\t\"" + System.Text.UTF8Encoding.UTF8.GetString(byteBuffer) + "\"");
 
-				serveurUdp.Send(byteBuffer, byteBuffer.Length, mcIPEndPoint);
-				streamLog.WriteLine(DateTime.Now.ToString()+" - {0} octets renvoyés vers {1}", byteBuffer.Length,mcIPEndPoint);
+				byteBuffer = System.Text.UTF8Encoding.UTF8.GetBytes("Ceci n'est pas un echo !");
+				serveurUdp.Send(byteBuffer, byteBuffer.Length, mcEndPoint);
+				streamLog.WriteLine(DateTime.Now.ToString("dd/MM/yy HH:mm:ss")+" - {0} octets renvoyés vers {1}", byteBuffer.Length,mcEndPoint);
 			}
 			catch (SocketException se) {
 				streamLog.WriteLine (se.ErrorCode + ": " + se.Message);
@@ -61,9 +64,10 @@ namespace UdpEchoServer
 		public void RenvoyerEchoEnBoucle()
 		{
 			StreamWriter streamLog = fichierLog.AppendText();
-			streamLog.WriteLine (DateTime.Now.ToString () + " - Démarrage du serveur");
+			streamLog.WriteLine (DateTime.Now.ToString ("dd/MM/yy HH:mm:ss") + " - Démarrage du serveur "+serveurUdp.Client.LocalEndPoint.ToString());
 			streamLog.Close ();
 			while (!arretServeur) {
+
 				RenvoyerUnEcho ();
 			}
 		}
